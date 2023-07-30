@@ -3,7 +3,7 @@ package sortTree
 import "sync"
 
 type node struct {
-	kv *kv
+	kv *Kv
 	left *node
 	right *node
 }
@@ -18,7 +18,7 @@ type SortTree struct {
 func (s *SortTree)Set(key,val string) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
-	newNode:=&node{kv: &kv{key: key,val: val}}
+	newNode:=&node{kv: &Kv{Key: key,Val: val}}
 	if s.root == nil{
 		s.size++
 		s.root = newNode
@@ -26,15 +26,15 @@ func (s *SortTree)Set(key,val string) {
 	}
 	cur:=s.root
 	for cur!= nil{
-		if cur.kv.key < key{
+		if cur.kv.Key < key{
 			if cur.left == nil{
 				cur.left = newNode
 				s.size++
 				return
 			}
 			cur = cur.left
-		}else if cur.kv.key == key{
-			cur.kv = &kv{key: key,val: val}
+		}else if cur.kv.Key == key{
+			cur.kv = &Kv{Key: key,Val: val}
 			return
 		}else {
 			if cur.right == nil{
@@ -54,16 +54,16 @@ func (s *SortTree)Get(key string)(string,bool){
 	defer s.lock.RUnlock()
 	cur:=s.root
 	for cur!= nil{
-		if cur.kv.key < key{
+		if cur.kv.Key < key{
 			if cur.left == nil{
 				return "",false
 			}
 			cur = cur.left
-		}else if cur.kv.key == key{
-			if cur.kv.delete {
+		}else if cur.kv.Key == key{
+			if cur.kv.Delete {
 				return "",false
 			}
-			return cur.kv.val,true
+			return cur.kv.Val,true
 		}else {
 			if cur.right == nil{
 				return "",false
@@ -79,13 +79,13 @@ func (s *SortTree)Delete(key string){
 	defer s.lock.Unlock()
 	cur:=s.root
 	for cur!= nil{
-		if cur.kv.key < key{
+		if cur.kv.Key < key{
 			if cur.left == nil{//没找到就直接返回
 				return
 			}
 			cur = cur.left
-		}else if cur.kv.key == key{//找到了就把它置为删除标记置为true
-			cur.kv.delete = true
+		}else if cur.kv.Key == key{//找到了就把它置为删除标记置为true
+			cur.kv.Delete = true
 			return
 		}else {
 			if cur.right == nil{//没找到就直接返回
