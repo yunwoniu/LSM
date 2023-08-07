@@ -99,3 +99,31 @@ func (s *SortTree)Delete(key string){
 func (s *SortTree)GetCount()int{
 	return s.size
 }
+
+func (s *SortTree)GetSortKv()[]*Kv{
+	st:=make([]*node,0)
+	if s.root == nil{
+		return nil
+	}
+	var ret []*Kv
+	st = append(st,s.root)
+	for len(st)!=0{
+		top:=st[len(st)-1]
+		st = st[:len(st)-1]
+		if top != nil{//中序遍历
+			if top.right != nil{
+				st = append(st,top.right)
+			}
+			st = append(st,top)
+			st = append(st,nil)
+			if top.left != nil{
+				st = append(st,top.left)
+			}
+		}else{
+			node:=st[len(st)-1]
+			ret = append(ret,node.kv)
+			st = st[:len(st)-1]
+		}
+	}
+	return ret
+}

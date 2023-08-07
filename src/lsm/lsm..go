@@ -38,6 +38,7 @@ func (l *LSM) Get(key string) (string, bool, error) {
 		return val, true, nil
 	}
 
+
 	return "", false, nil
 }
 
@@ -62,3 +63,10 @@ func (l *LSM) Delete(key string) error {
 	l.memTable.Delete(key)
 	return nil
 }
+
+
+func (l *LSM)memToSst()error{
+	ks:=l.memTable.GetSortKv()
+
+}
+
