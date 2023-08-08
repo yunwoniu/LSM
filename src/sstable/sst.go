@@ -27,6 +27,14 @@ type sst struct {
 	bigKey   string
 }
 
+/*
+	------------+-----------+-------------+------------+------------+--------------+-------------+--------+------+   ------------+
+	 headLenght |smallKeyLen|  smallKey   | bigKeyLen  |  bigKey    |  indexMapLen | indexMap    | kvLen  | kv   |***| kvLen | kv
+	------------+-----------+-------------+------------+------------+--------------+-------------+--------+------+   ------------+
+		8Bytes  |  8Bytes   | smallKeyLen |  8Bytes    | bigKeyLen  |    8Bytes    | indexMapLen | 8Bytes |kvLen |***| 8Byte |kvLen
+	------------+-----------+-------------+------------+------------+--------------+-------------+-------+------+   -------------+
+*/
+
 func memToSst(dir string, kvs []*sortTree.Kv, level, index int) (*sst, error) {
 	sstName := fmt.Sprintf("%d%s%d", level, sstSplit, index)
 	fd, err := os.Create(path.Join(dir, sstName))
