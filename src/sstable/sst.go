@@ -27,7 +27,13 @@ type sst struct {
 	bigKey   string
 }
 
-func memToSst(dir string, kvs []*sortTree.Kv, level, index int) (*sst, error) {
+type Mate struct {
+	SmallKey string
+	BigKey string
+	KeyIndex map[string]int
+}
+
+func MemToSst(dir string, kvs []*sortTree.Kv, level, index int) (*sst, error) {
 	sstName := fmt.Sprintf("%d%s%d", level, sstSplit, index)
 	fd, err := os.Create(path.Join(dir, sstName))
 	if err != nil {
@@ -35,6 +41,18 @@ func memToSst(dir string, kvs []*sortTree.Kv, level, index int) (*sst, error) {
 		return nil, err
 	}
 	defer fd.Close()
+
+	mate:=&Mate{
+		SmallKey: kvs[0].Key,
+		BigKey:   kvs[len(kvs)-1].Key,
+	}
+	keyIndex := make(map[string]int)
+	for _,kv:= range kvs{
+		_,buf:=kv.Marshal()
+
+	}
+
+
 
 	return &sst{
 		level:    level,
