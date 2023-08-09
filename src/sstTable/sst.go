@@ -1,4 +1,4 @@
-package sstable
+package sstTable
 
 import (
 	"bytes"
@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"lsm"
 	"os"
@@ -37,12 +36,12 @@ type sst struct {
 	------------+-----------+-------------+------------+------------+--------------+-------------+-------+------+   -------------+
 */
 
-func MemToSst(dir string, kvs []*sortTree.Kv, level, index int) (*sst, error) {
+func (s *TableTree) MemToSst(dir string, kvs []*sortTree.Kv, level, index int) error {
 	sstName := fmt.Sprintf("%d%s%d", level, sstSplit, index)
 	fd, err := os.Create(path.Join(dir, sstName))
 	if err != nil {
 		log.Println(err)
-		return nil, err
+		return err
 	}
 	defer fd.Close()
 
@@ -77,21 +76,23 @@ func MemToSst(dir string, kvs []*sortTree.Kv, level, index int) (*sst, error) {
 	_, err = fd.Write(headBuf.Bytes())
 	if err != nil {
 		log.Println(err)
-		return nil, err
+		return err
 	}
 	_, err = fd.Write(kvsBuf.Bytes())
 	if err != nil {
 		log.Println(err)
-		return nil, err
+		return err
 	}
 
-	return &sst{
+	sst := &sst{
 		level:    level,
 		index:    index,
 		smallKey: kvs[0].Key,
 		bigKey:   kvs[len(kvs)-1].Key,
 		indexMap: indexMap,
-	}, nil
+	}
+	s.levels[level] = append(s.levels[level], sst)
+	return nil
 }
 
 /*
@@ -167,7 +168,11 @@ type TableTree struct {
 	levelLen      int
 }
 
-func LoadTableTree(dir string, opt lsm.Options) (*TableTree, error) {
+func (s *TableTree) GetLevelMaxIndex(level int) int {
+	return len(s.levels[level])
+}
+
+func LoadTableTree(dir string, opt *lsm.Options) (*TableTree, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		log.Println(err)

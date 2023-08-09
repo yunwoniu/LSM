@@ -3,6 +3,7 @@ package lsm
 import (
 	"os"
 	"sortTree"
+	"sstTable"
 	"sync"
 )
 
@@ -14,7 +15,9 @@ const (
 type LSM struct {
 	w        *wal
 	memTable *sortTree.SortTree
+	sstTable *sstTable.TableTree
 	rLock    sync.RWMutex
+	dirPath  string
 }
 
 type Options struct {
@@ -30,10 +33,16 @@ func Open(dir string, opt *Options) (*LSM, error) {
 	if err != nil {
 		return nil, err
 	}
+	sstTable, err := sstTable.LoadTableTree(dir, opt)
+	if err != nil {
+		return nil, err
+	}
 	lsm := &LSM{
 		w:        &wal,
 		memTable: mem,
+		sstTable: sstTable,
 		rLock:    sync.RWMutex{},
+		dirPath:  dir,
 	}
 	return lsm, nil
 }
@@ -73,6 +82,10 @@ func (l *LSM) memToSst() error {
 	if len(kvs) == 0 {
 		return nil
 	}
-
+	maxIndex := l.sstTable.GetLevelMaxIndex(0)
+	err := l.sstTable.MemToSst(l.dirPath, kvs, 0, maxIndex)
+	if err != nil {
+		return err
+	}
 	return nil
 }
