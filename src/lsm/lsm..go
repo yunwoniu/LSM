@@ -6,6 +6,11 @@ import (
 	"sync"
 )
 
+const (
+	Wal = ".wal"
+	Sst = ".sst"
+)
+
 type LSM struct {
 	w        *wal
 	memTable *sortTree.SortTree
