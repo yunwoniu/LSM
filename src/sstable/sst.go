@@ -6,24 +6,19 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"lsm"
 	"os"
 	"path"
+	"path/filepath"
+	"sort"
 	"sortTree"
 	"strconv"
 	"strings"
 )
 
 const sstSplit = "_"
-
-type TableTree struct {
-	levels        [][]*sst
-	l0MaxSize     int
-	levelSizeRate int
-	levelMaxSize  []int
-	levelLen      int
-}
 
 type sst struct {
 	level    int
@@ -108,12 +103,27 @@ func MemToSst(dir string, kvs []*sortTree.Kv, level, index int) (*sst, error) {
 */
 
 func fileToSst(path string) (*sst, error) {
+	name := filepath.Base(path)
+	sstName := strings.TrimSuffix(name, lsm.Sst)
+	sps := strings.Split(sstName, sstSplit)
+	if len(sps) != 2 {
+		return nil, errors.New(fmt.Sprintf("sst name:%s error", sstName))
+	}
+	level, err := strconv.Atoi(sps[0])
+	if err != nil {
+		return nil, errors.New(fmt.Sprintf("sst name:%s error", sstName))
+	}
+	index, err := strconv.Atoi(sps[1])
+	if err != nil {
+		return nil, errors.New(fmt.Sprintf("sst name:%s error", sstName))
+	}
+
 	fd, err := os.Open(path)
 	if err != nil {
 		return nil, err
 	}
 	headLenght := 0
-	err := binary.Read(fd, binary.LittleEndian, headLenght)
+	err = binary.Read(fd, binary.LittleEndian, headLenght)
 	if err != nil {
 		log.Println(err)
 		return nil, err
@@ -126,38 +136,71 @@ func fileToSst(path string) (*sst, error) {
 	}
 	buf := &bytes.Buffer{}
 	buf.Write(headData)
+	smallKeyLen := uint64(0)
+	binary.Read(buf, binary.LittleEndian, smallKeyLen)
+	smallKey := make([]byte, smallKeyLen)
+	binary.Read(buf, binary.LittleEndian, smallKey)
+	bigKeyLen := uint64(0)
+	binary.Read(buf, binary.LittleEndian, bigKeyLen)
+	bigKey := make([]byte, bigKeyLen)
+	binary.Read(buf, binary.LittleEndian, bigKey)
+	indexMapLen := uint64(0)
+	indexMapData := make([]byte, indexMapLen)
+	binary.Read(buf, binary.LittleEndian, indexMapData)
+	indexMap := make(map[string]int)
+	json.Unmarshal(indexMapData, &indexMap)
+	return &sst{
+		level:    level,
+		index:    index,
+		smallKey: string(smallKey),
+		bigKey:   string(bigKey),
+		f:        fd,
+		indexMap: indexMap,
+	}, nil
+}
 
+type TableTree struct {
+	levels        [][]*sst
+	l0MaxSize     int
+	levelSizeRate int
+	levelMaxSize  []int
+	levelLen      int
 }
 
 func LoadTableTree(dir string, opt lsm.Options) (*TableTree, error) {
-	dirs, err := os.ReadDir(dir)
+	entries, err := os.ReadDir(dir)
 	if err != nil {
 		log.Println(err)
 		return nil, err
 	}
 	levels := make([][]*sst, opt.LevelLen)
-	for _, dir := range dirs {
-		if !strings.HasSuffix(dir.Name(), lsm.Sst) || dir.IsDir() {
+	for _, entry := range entries {
+		if !strings.HasSuffix(entry.Name(), lsm.Sst) || entry.IsDir() {
 			continue
 		}
-		sstName := strings.TrimSuffix(dir.Name(), lsm.Sst)
-		sps := strings.Split(sstName, sstSplit)
-		if len(sps) != 2 {
-			return nil, errors.New(fmt.Sprintf("sst name:%s error", sstName))
-		}
-		level, err := strconv.Atoi(sps[0])
+		sst, err := fileToSst(filepath.Join(dir, entry.Name()))
 		if err != nil {
-			return nil, errors.New(fmt.Sprintf("sst name:%s error", sstName))
+			return nil, err
 		}
-		index, err := strconv.Atoi(sps[1])
-		if err != nil {
-			return nil, errors.New(fmt.Sprintf("sst name:%s error", sstName))
-		}
-		sst := &sst{
-			level: level,
-			index: index,
-		}
-		levels[level] = append(levels[level])
-
+		levels[sst.level] = append(levels[sst.level], sst)
 	}
+	levelSize := opt.L0MaxSize
+	levelMaxSize := make([]int, opt.LevelLen)
+	for index, level := range levels {
+		levelMaxSize[index] = levelSize
+		levelSize = levelSize * opt.LevelSizeRate
+		sort.Slice(level, func(i, j int) bool {
+			if level[i].index < level[j].index {
+				return true
+			}
+			return false
+		})
+	}
+	return &TableTree{
+		levels:        levels,
+		levelMaxSize:  levelMaxSize,
+		l0MaxSize:     opt.L0MaxSize,
+		levelSizeRate: opt.LevelSizeRate,
+		levelLen:      opt.LevelLen,
+	}, nil
 }
